@@ -1,3 +1,26 @@
+Add-Type -AssemblyName System.Windows.Forms
+
+# Function to show the folder browser dialog
+function Show-FolderBrowser {
+    $folderBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
+    $folderBrowser.Description = "Select the rustdesk project directory"
+    $folderBrowser.ShowNewFolderButton = $false 
+
+    if ($folderBrowser.ShowDialog() -eq 'OK') {
+        return $folderBrowser.SelectedPath
+    }
+    return $null
+}
+
+# Prompt user to select the Project Directory
+$projectDirectory = Show-FolderBrowser
+
+# Validate the selected path
+if (-Not (Test-Path -Path $projectDirectory)) {
+    Write-Host "The specified directory does not exist: $projectDirectory"
+    exit
+}
+
 # Paths to the files
 $buildFilePath = 'D:\buildrustdesk\rustdesk\build.py'
 $cargoFilePath = 'D:\buildrustdesk\rustdesk\Cargo.toml'
