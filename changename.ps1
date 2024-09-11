@@ -3,7 +3,7 @@ Add-Type -AssemblyName System.Windows.Forms
 # Function to show the folder browser dialog
 function Show-FolderBrowser {
     $folderBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
-    $folderBrowser.Description = "Select the rustdesk project directory"
+    $folderBrowser.Description = "Select the RustDesk project directory"
     $folderBrowser.ShowNewFolderButton = $false 
 
     if ($folderBrowser.ShowDialog() -eq 'OK') {
@@ -16,102 +16,57 @@ function Show-FolderBrowser {
 $projectDirectory = Show-FolderBrowser
 
 # Validate the selected path
+if (-Not $projectDirectory) {
+    Write-Host "Folder selection was cancelled. Exiting."
+    exit
+}
+
 if (-Not (Test-Path -Path $projectDirectory)) {
     Write-Host "The specified directory does not exist: $projectDirectory"
     exit
 }
 
 # Paths to the files
-$buildFilePath = 'D:\buildrustdesk\rustdesk\build.py'
-$cargoFilePath = 'D:\buildrustdesk\rustdesk\Cargo.toml'
-$portableCargoFilePath = 'D:\buildrustdesk\rustdesk\libs\portable\Cargo.toml'  # Path for portable Cargo.toml
-$generateFilePath = 'D:\buildrustdesk\rustdesk\libs\portable\generate.py'       # Path for generate.py
-$mainRsFilePath = 'D:\buildrustdesk\rustdesk\libs\portable\src\main.rs'         # Path for main.rs
-$desktopFilePath = 'D:\buildrustdesk\rustdesk\res\rustdesk.desktop'               # Path for rustdesk.desktop
-$serviceFilePath = 'D:\buildrustdesk\rustdesk\res\rustdesk.service'               # Path for rustdesk.service
-$nativeDartFilePath = 'D:\buildrustdesk\rustdesk\flutter\lib\models\native_model.dart'
-$platformDartFilePath = 'D:\buildrustdesk\rustdesk\flutter\lib\models\platform_model.dart'
-$webDartFilePath = 'D:\buildrustdesk\rustdesk\flutter\lib\models\web_model.dart'   # Path for web_model.dart
-$bridgeDartFilePath = 'D:\buildrustdesk\rustdesk\flutter\lib\web\bridge.dart'      # Path for bridge.dart
-$cMakeListsFilePath = 'D:\buildrustdesk\rustdesk\flutter\windows\CMakeLists.txt'   # Path for CMakeLists.txt
-$mainCppFilePath = 'D:\buildrustdesk\rustdesk\flutter\windows\runner\main.cpp'      # Path for main.cpp
-$runnerRcFilePath = 'D:\buildrustdesk\rustdesk\flutter\windows\runner\Runner.rc'    # Added path for Runner.rc
-$configRsFilePath = 'D:\buildrustdesk\rustdesk\libs\hbb_common\src\config.rs'      # Path for config.rs
+$buildFilePath = Join-Path -Path $projectDirectory -ChildPath 'build.py'
+$cargoFilePath = Join-Path -Path $projectDirectory -ChildPath 'Cargo.toml'
+$portableCargoFilePath = Join-Path -Path $projectDirectory -ChildPath 'libs\portable\Cargo.toml'
+$generateFilePath = Join-Path -Path $projectDirectory -ChildPath 'libs\portable\generate.py'
+$mainRsFilePath = Join-Path -Path $projectDirectory -ChildPath 'libs\portable\src\main.rs'
+$desktopFilePath = Join-Path -Path $projectDirectory -ChildPath 'res\rustdesk.desktop'
+$serviceFilePath = Join-Path -Path $projectDirectory -ChildPath 'res\rustdesk.service'
+$nativeDartFilePath = Join-Path -Path $projectDirectory -ChildPath 'flutter\lib\models\native_model.dart'
+$platformDartFilePath = Join-Path -Path $projectDirectory -ChildPath 'flutter\lib\models\platform_model.dart'
+$webDartFilePath = Join-Path -Path $projectDirectory -ChildPath 'flutter\lib\models\web_model.dart'
+$bridgeDartFilePath = Join-Path -Path $projectDirectory -ChildPath 'flutter\lib\web\bridge.dart'
+$cMakeListsFilePath = Join-Path -Path $projectDirectory -ChildPath 'flutter\windows\CMakeLists.txt'
+$mainCppFilePath = Join-Path -Path $projectDirectory -ChildPath 'flutter\windows\runner\main.cpp'
+$runnerRcFilePath = Join-Path -Path $projectDirectory -ChildPath 'flutter\windows\runner\Runner.rc'
+$configRsFilePath = Join-Path -Path $projectDirectory -ChildPath 'libs\hbb_common\src\config.rs'
 
 # Check if the files exist
-if (-Not (Test-Path -Path $buildFilePath)) {
-    Write-Host "The file 'build.py' does not exist at the specified path: $buildFilePath"
-    exit
-}
+$filePaths = @(
+    $buildFilePath,
+    $cargoFilePath,
+    $portableCargoFilePath,
+    $generateFilePath,
+    $mainRsFilePath,
+    $desktopFilePath,
+    $serviceFilePath,
+    $nativeDartFilePath,
+    $platformDartFilePath,
+    $webDartFilePath,
+    $bridgeDartFilePath,
+    $cMakeListsFilePath,
+    $mainCppFilePath,
+    $runnerRcFilePath,
+    $configRsFilePath
+)
 
-if (-Not (Test-Path -Path $cargoFilePath)) {
-    Write-Host "The file 'Cargo.toml' does not exist at the specified path: $cargoFilePath"
-    exit
-}
-
-if (-Not (Test-Path -Path $portableCargoFilePath)) {  # Check if the portable Cargo.toml file exists
-    Write-Host "The file 'Cargo.toml' does not exist in the portable directory: $portableCargoFilePath"
-    exit
-}
-
-if (-Not (Test-Path -Path $generateFilePath)) {  # Check if generate.py exists
-    Write-Host "The file 'generate.py' does not exist at the specified path: $generateFilePath"
-    exit
-}
-
-if (-Not (Test-Path -Path $mainRsFilePath)) {  # Check if main.rs exists
-    Write-Host "The file 'main.rs' does not exist at the specified path: $mainRsFilePath"
-    exit
-}
-
-if (-Not (Test-Path -Path $desktopFilePath)) {  # Check if rustdesk.desktop exists
-    Write-Host "The file 'rustdesk.desktop' does not exist at the specified path: $desktopFilePath"
-    exit
-}
-
-if (-Not (Test-Path -Path $serviceFilePath)) {  # Check if rustdesk.service exists
-    Write-Host "The file 'rustdesk.service' does not exist at the specified path: $serviceFilePath"
-    exit
-}
-
-if (-Not (Test-Path -Path $nativeDartFilePath)) {
-    Write-Host "The file 'native_model.dart' does not exist at the specified path: $nativeDartFilePath"
-    exit
-}
-
-if (-Not (Test-Path -Path $platformDartFilePath)) {
-    Write-Host "The file 'platform_model.dart' does not exist at the specified path: $platformDartFilePath"
-    exit
-}
-
-if (-Not (Test-Path -Path $webDartFilePath)) {
-    Write-Host "The file 'web_model.dart' does not exist at the specified path: $webDartFilePath"
-    exit
-}
-
-if (-Not (Test-Path -Path $bridgeDartFilePath)) {
-    Write-Host "The file 'bridge.dart' does not exist at the specified path: $bridgeDartFilePath"
-    exit
-}
-
-if (-Not (Test-Path -Path $cMakeListsFilePath)) {  # Check if CMakeLists.txt exists
-    Write-Host "The file 'CMakeLists.txt' does not exist at the specified path: $cMakeListsFilePath"
-    exit
-}
-
-if (-Not (Test-Path -Path $mainCppFilePath)) {  # Check if main.cpp exists
-    Write-Host "The file 'main.cpp' does not exist at the specified path: $mainCppFilePath"
-    exit
-}
-
-if (-Not (Test-Path -Path $runnerRcFilePath)) {  # Check if Runner.rc exists
-    Write-Host "The file 'Runner.rc' does not exist at the specified path: $runnerRcFilePath"
-    exit
-}
-
-if (-Not (Test-Path -Path $configRsFilePath)) {   # Check if config.rs exists
-    Write-Host "The file 'config.rs' does not exist at the specified path: $configRsFilePath"
-    exit
+foreach ($filePath in $filePaths) {
+    if (-Not (Test-Path -Path $filePath)) {
+        Write-Host "The file does not exist at the specified path: $filePath"
+        exit
+    }
 }
 
 # Prompt the user for a new application name
@@ -123,9 +78,17 @@ if ([string]::IsNullOrWhiteSpace($newAppName)) {
     exit
 }
 
+# Backup existing files (optional; adjust as needed)
+$backupDir = Join-Path -Path $projectDirectory -ChildPath 'Backup'
+New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
+
+foreach ($filePath in $filePaths) {
+    Copy-Item -Path $filePath -Destination $backupDir -Force
+}
+
 # Update build.py
 $buildFileContent = Get-Content -Path $buildFilePath -Raw
-$updatedBuildFileContent = $buildFileContent -replace "hbb_name = 'rustdesk'", "hbb_name = '$newAppName'"
+$updatedBuildFileContent = $buildFileContent -replace "hbb_name = 'rustdesk'", "hbb_name = `"$newAppName`""
 Set-Content -Path $buildFilePath -Value $updatedBuildFileContent
 Write-Host "Updated build.py with new app name: $newAppName"
 
@@ -209,7 +172,6 @@ $updatedMainCppFileContent = $mainCppFileContent -replace 'std::wstring app_name
 Set-Content -Path $mainCppFilePath -Value $updatedMainCppFileContent
 Write-Host "Updated main.cpp with new app name: $newAppName"
 
-# Assume $newAppName is defined earlier in your script.
 # Update Runner.rc
 $runnerRcFileContent = Get-Content -Path $runnerRcFilePath -Raw
 
