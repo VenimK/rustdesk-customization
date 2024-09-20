@@ -2,6 +2,7 @@ import os
 import base64
 import subprocess
 import shutil
+import requests
 from PIL import Image, ImageTk
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -16,12 +17,24 @@ command_entry = None
 # Set the theme name
 theme_name = "aquativo"
 
+def download_icon(icon_url, icon_path):
+    """Download an icon from a URL and save it to a local path."""
+    try:
+        response = requests.get(icon_url)
+        response.raise_for_status()  # Raise an error for bad responses
+        with open(icon_path, 'wb') as f:
+            f.write(response.content)
+        print(f"Icon downloaded successfully: {icon_path}")
+        return True
+    except Exception as e:
+        print(f"Error downloading icon: {e}")
+        return False
+
 def set_icon(window, icon_path):
     """Set the icon for a given Tkinter window."""
     if icon_path and os.path.isfile(icon_path):
         try:
-            # For .ico files, use the file directly
-            window.iconbitmap(icon_path)  # This works for ICO files
+            window.iconbitmap(icon_path)
             return True
         except Exception as e:
             print(f"Error loading icon: {e}")
@@ -481,19 +494,23 @@ def on_closing():
         root.destroy()  # Destroy the root window
 
 # Main application setup
-icon_path = r"C:\Users\VenimK\Downloads\Wrench.ico"
-if os.path.isfile(icon_path):
+icon_url = "https://www.iconarchive.com/download/i144838/gartoon-team/gartoon-apps/gnome-remote-shell.ico"  # Icon URL
+icon_path = "downloaded_icon.ico"  # Path where the icon will be saved
+
+# Download the icon
+if download_icon(icon_url, icon_path):
+    # Now show the splash screen with the downloaded icon
     splash = show_splash_screen(theme_name=theme_name, icon_path=icon_path)
 else:
-    print(f"Icon file does not exist at: {icon_path}")
+    print(f"Icon could not be downloaded from: {icon_url}")
 
-# Create and set up the main window
+# Load main window after the splash
 root = ThemedTk()
 root.title("Infinite Remote")
 root.geometry("600x400")
 root.set_theme(theme_name)
 
-# Make sure to set the icon for the main window here
+# Set the icon for the main window
 if not set_icon(root, icon_path):
     print("Failed to set icon on main window.")
 
@@ -534,6 +551,10 @@ root.protocol("WM_DELETE_WINDOW", on_closing)
 
 # Start the GUI loop
 root.mainloop()
+
+# Clean up: Remove the icon file after use
+if os.path.exists(icon_path):
+    os.remove(icon_path)
 
 # Only necessary for debugging
 print(root.get_themes())  # This will list all available themes
