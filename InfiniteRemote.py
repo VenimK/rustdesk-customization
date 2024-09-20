@@ -1,54 +1,74 @@
 import os
 import base64
 import subprocess
+import shutil
+from PIL import Image, ImageTk
 import tkinter as tk
 from tkinter import filedialog, messagebox
-import shutil
+from ttkthemes import ThemedTk
+import tkinter.ttk as ttk
 
-# Declare global variables for the entry fields
+# Global variables for the entry fields
 app_name_entry = None
 executable_name_entry = None
 command_entry = None
 
-def show_splash_screen():
+# Set the theme name
+theme_name = "aquativo"
+
+def set_icon(window, icon_path):
+    """Set the icon for a given Tkinter window."""
+    if icon_path and os.path.isfile(icon_path):
+        try:
+            image = Image.open(icon_path)
+            photo = ImageTk.PhotoImage(image)
+            window.iconphoto(True, photo)  # Set the window icon
+            return True
+        except Exception as e:
+            print(f"Error loading icon: {e}")
+            return False
+    else:
+        print(f"Icon path is not valid: {icon_path}")
+        return False
+
+def show_splash_screen(theme_name="arc", icon_path=None):
     """Show a splash screen while the app is loading."""
-    splash = tk.Toplevel()  # Create a new top-level window
-    splash.title("Loading...RustDesk Renamer")
+    splash = ThemedTk(theme=theme_name)
+    splash.title("Loading...Infinite Remote")
     splash.geometry("300x200")
 
-    # Center the splash screen on the screen
+    # Center splash screen
     screen_width = splash.winfo_screenwidth()
     screen_height = splash.winfo_screenheight()
     x = (screen_width // 2) - (300 // 2)
     y = (screen_height // 2) - (200 // 2)
     splash.geometry(f"300x200+{x}+{y}")
 
-    label = tk.Label(splash, text="Welcome to RustDesk Renamer", font=('Helvetica', 12))
+    # Load icon for splash screen
+    if not set_icon(splash, icon_path):
+        print("Failed to set icon on splash screen.")
+
+    label = ttk.Label(splash, text="Welcome to Infinite Remote", font=('Helvetica', 12))
     label.pack(expand=True)
 
-    # Close the splash screen after a delay (3000 milliseconds = 3 seconds)
-    splash.after(3000, splash.destroy)
+    progress_bar = ttk.Progressbar(splash, orient=tk.HORIZONTAL, length=200, mode='indeterminate')
+    progress_bar.pack(pady=20)
 
-    # Ensure splash screen stays on top
+    style = ttk.Style()
+    style.theme_use(theme_name)
+    style.configure("TProgressbar", troughcolor='gray', background='navy')
+
+    # Start the progress bar
+    progress_bar.start()
+    splash.after(3000, lambda: (progress_bar.stop(), splash.destroy()))
     splash.protocol("WM_DELETE_WINDOW", splash.withdraw)
-    splash.lift()  # Bring the splash screen to the front
-    return splash  # Return the splash so we can keep a reference
+    splash.lift()
+    return splash
 
-def update_generate_py(file_path, new_executable_name):
-    """Update the generate.py file with the new executable name."""
-    print(f"Updating {file_path} with the new executable name: {new_executable_name}")
-    lines = read_file(file_path)
-    if lines is not None:
-        for i, line in enumerate(lines):
-            if "executable_name" in line:
-                lines[i] = f"executable_name = '{new_executable_name}'\n"
-                break
-        write_file(file_path, lines)
-
-def convert_to_base64(image_path):
-    """Convert an image file to a Base64 string."""
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode('utf-8')
+def setup_window(root, icon_path):
+    """Set up the main window with the specified icon."""
+    if not set_icon(root, icon_path):
+        print("Failed to set icon on main window.")
 
 def select_file(title, filetypes):
     """Open a file dialog to select a file."""
@@ -76,6 +96,22 @@ def write_file(file_path, content):
     with open(file_path, 'w', encoding='utf-8') as file:
         file.writelines(content)
 
+def update_generate_py(file_path, new_executable_name):
+    """Update the generate.py file with the new executable name."""
+    print(f"Updating {file_path} with the new executable name: {new_executable_name}")
+    lines = read_file(file_path)
+    if lines is not None:
+        for i, line in enumerate(lines):
+            if "executable_name" in line:
+                lines[i] = f"executable_name = '{new_executable_name}'\n"
+                break
+        write_file(file_path, lines)
+
+def convert_to_base64(image_path):
+    """Convert an image file to a Base64 string."""
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode('utf-8')
+
 def update_build_py(file_path, new_app_name):
     """Update the build.py file with the new application name."""
     print(f"Updating {file_path} with the new application name: {new_app_name}")
@@ -88,8 +124,8 @@ def update_build_py(file_path, new_app_name):
         write_file(file_path, lines)
 
 def update_cargo_toml(file_path, new_app_name):
+    """Update the Cargo.toml file to set name, default-run and modify features."""
     try:
-        """Update the Cargo.toml file to set name, default-run, and modify features."""
         content = read_file(file_path)
         if content is None:
             return
@@ -100,48 +136,34 @@ def update_cargo_toml(file_path, new_app_name):
         in_features_section = False
         
         for line in content:
-            stripped_line = line.strip()  # Trim whitespace
-            
-            # Identify the start of the [package] section
+            stripped_line = line.strip()
             if stripped_line == '[package]':
                 in_package_section = True
-
-            # Define end of the section on encountering a new section header
             elif in_package_section and stripped_line.startswith('['):
                 in_package_section = False
             
-            # Update 'name' and 'default-run' in the [package] section
+            # Update 'name' and 'default-run'
             if in_package_section:
-                # Check and update 'name' field
                 if stripped_line.startswith('name ='):
                     line = f'name = "{new_app_name}"\n'
-                # Check and update 'default-run' field
                 elif stripped_line.startswith('default-run ='):
                     line = f'default-run = "{new_app_name}"\n'
 
-            # Identify the start of the [package.metadata.winres] section
+            # Update [package.metadata.winres]
             if stripped_line == '[package.metadata.winres]':
                 in_metadata_section = True
-            
-            # Update 'ProductName' and 'OriginalFilename' in the [package.metadata.winres] section
             if in_metadata_section:
-                # Check and update 'ProductName' field
                 if stripped_line.startswith('ProductName ='):
                     line = f'ProductName = "{new_app_name}"\n'
-                # Check and update 'OriginalFilename' field
                 elif stripped_line.startswith('OriginalFilename ='):
                     line = f'OriginalFilename = "{new_app_name.lower()}.exe"\n'
 
-            # Identify the start of the [features] section
+            # Update [features]
             if stripped_line == '[features]':
                 in_features_section = True
-            
-            # Update 'use_dasp' within the [features] section
             if in_features_section:
                 if stripped_line.startswith('default ='):
                     line = 'default = ["use_dasp", "inline"]\n'
-
-            # If a new section starts, we need to exit the features section
             elif in_features_section and stripped_line.startswith('['):
                 in_features_section = False
 
@@ -149,8 +171,7 @@ def update_cargo_toml(file_path, new_app_name):
 
         write_file(file_path, updated_content)
         print("Updated Cargo.toml content:")
-        print(''.join(updated_content))  # Print updated content for debugging
-        
+        print(''.join(updated_content))
     except FileNotFoundError:
         print("Cargo.toml file not found in the selected directory.")
     except Exception as e:
@@ -236,52 +257,46 @@ def update_runner_rc(file_path, new_app_name):
         write_file(file_path, lines)
 
 def update_portable_cargo_toml(file_path, new_app_name):
-    """
-    This function updates the Cargo.toml file in libs/portable
-    to set the ProductName and OriginalFilename based on the new app name.
-    """
+    """Update the Cargo.toml file in libs/portable to set the ProductName and OriginalFilename."""
     try:
         with open(file_path, 'r', encoding='utf-8-sig') as file:
             content = file.readlines()
 
         print("Original libs/portable/Cargo.toml content:")
-        print(''.join(content))  # Print original content for debugging
+        print(''.join(content))
 
         updated_content = []
         in_winres_section = False
 
         for line in content:
-            stripped_line = line.strip()  # Trim whitespace from both ends
-            print(f"Processing line: '{stripped_line}'")  # Debug output
+            stripped_line = line.strip()
+            print(f"Processing line: '{stripped_line}'")
 
             if stripped_line == '[package.metadata.winres]':
                 in_winres_section = True
-                print("Entering [package.metadata.winres] section.")  # Debug output
-                updated_content.append(line)  # Preserve the section header
+                print("Entering [package.metadata.winres] section.")
+                updated_content.append(line)
                 continue
             
             elif in_winres_section and stripped_line.startswith('['):
-                in_winres_section = False  # Exit from winres section
-                print("Exiting [package.metadata.winres] section.")  # Debug output
+                in_winres_section = False  
+                print("Exiting [package.metadata.winres] section.")
 
             if in_winres_section:
-                # Check and update 'ProductName' field
                 if stripped_line.startswith('ProductName ='):
-                    print(f"Updating ProductName from: {line.strip()} to ProductName = \"{new_app_name}\"")  # Debug output
-                    line = f'ProductName = "{new_app_name}"\n'  # Updated line
-                # Check and update 'OriginalFilename' field
+                    print(f"Updating ProductName from: {line.strip()} to ProductName = \"{new_app_name}\"")
+                    line = f'ProductName = "{new_app_name}"\n'
                 elif stripped_line.startswith('OriginalFilename ='):
-                    print(f"Updating OriginalFilename from: {line.strip()} to OriginalFilename = \"{new_app_name.lower()}.exe\"")  # Debug output
-                    line = f'OriginalFilename = "{new_app_name.lower()}.exe"\n'  # Updated line
+                    print(f"Updating OriginalFilename from: {line.strip()} to OriginalFilename = \"{new_app_name.lower()}.exe\"")
+                    line = f'OriginalFilename = "{new_app_name.lower()}.exe"\n'
 
             updated_content.append(line)
 
-        # Write the changes back to the libs/portable/Cargo.toml file
         with open(file_path, 'w', encoding='utf-8') as file:
             file.writelines(updated_content)
 
         print("Updated libs/portable/Cargo.toml content:")
-        print(''.join(updated_content))  # Print updated content for debugging
+        print(''.join(updated_content))
 
     except FileNotFoundError:
         print("libs/portable/Cargo.toml file not found in the selected directory.")
@@ -289,6 +304,7 @@ def update_portable_cargo_toml(file_path, new_app_name):
         print(f"An error occurred while updating libs/portable/Cargo.toml: {e}")
 
 def update_config_rs(file_path, new_app_name):
+    """Update the config.rs file with the new application name."""
     try:
         lines = read_file(file_path)
         if lines is None:
@@ -371,7 +387,7 @@ def browse_directory():
         root.deiconify()
         return
 
-    icon_file = select_file("Select the Icon Image", [("Image Files", "*.png;*.ico")])
+    icon_file = select_file("Select the Icon PNG Image", [("Image Files", "*.png")])
     if not icon_file or not os.path.isfile(icon_file):
         print("No icon image selected. Exiting.")
         root.deiconify()
@@ -386,19 +402,20 @@ def browse_directory():
         if not os.path.exists(res_dir):
             print(f"The resource directory '{res_dir}' does not exist.")
             return
-        
-        # Copy and rename the icon
-        icon_destination_path = os.path.join(res_dir, 'icon.ico')
-        shutil.copy2(icon_file, icon_destination_path)  # Copy icon to the res dir as icon.ico
-        print(f"Copied icon to '{icon_destination_path}'")
 
-        # Copy and rename to tray-icon
+        # Convert PNG to ICO and save as icon.ico
+        icon_destination_path = os.path.join(res_dir, 'icon.ico')
+        with Image.open(icon_file) as img:
+            img.save(icon_destination_path, format='ICO')  # Save as ICO format
+        print(f"Converted and saved icon to '{icon_destination_path}'")
+
+        # Copy the icon.ico to create tray-icon
         tray_icon_destination_path = os.path.join(res_dir, 'tray-icon.ico')
-        shutil.copy2(icon_destination_path, tray_icon_destination_path)  # Copy icon.ico to tray-icon
+        shutil.copy2(icon_destination_path, tray_icon_destination_path)
         print(f"Copied icon to '{tray_icon_destination_path}'")
 
     except Exception as e:
-        print(f"An error occurred while copying the icon: {e}")
+        print(f"An error occurred while processing the icon: {e}")
 
     new_app_name = app_name_entry.get().strip()
     executable_name = executable_name_entry.get().strip()
@@ -424,10 +441,10 @@ def browse_directory():
         update_native_model(os.path.join(base_directory, 'flutter', 'lib', 'models', 'native_model.dart'), new_app_name)
         update_platform_model(os.path.join(base_directory, 'flutter', 'lib', 'models', 'platform_model.dart'), new_app_name)
         update_web_model(os.path.join(base_directory, 'flutter', 'lib', 'models', 'web_model.dart'), new_app_name)
-        update_bridge_file(os.path.join(base_directory, 'flutter', 'lib', 'web', 'bridge.dart'), new_app_name) 
+        update_bridge_file(os.path.join(base_directory, 'flutter', 'lib', 'web', 'bridge.dart'), new_app_name)
         update_cmakelists(os.path.join(base_directory, 'flutter', 'windows', 'CMakeLists.txt'), new_app_name)
         update_main_cpp(os.path.join(base_directory, 'flutter', 'windows', 'runner', 'main.cpp'), new_app_name)
-        update_runner_rc(os.path.join(base_directory, 'flutter', 'windows', 'runner', 'Runner.rc'), new_app_name)  
+        update_runner_rc(os.path.join(base_directory, 'flutter', 'windows', 'runner', 'Runner.rc'), new_app_name)
         update_portable_cargo_toml(os.path.join(base_directory, 'libs', 'portable', 'Cargo.toml'), new_app_name)
         update_config_rs(os.path.join(base_directory, 'libs', 'hbb_common', 'src', 'config.rs'), new_app_name)
         rust_file_path = os.path.join(base_directory, 'libs', 'portable', 'src', 'main.rs')
@@ -469,40 +486,59 @@ def on_closing():
         root.quit()  # Exit the main loop
         root.destroy()  # Destroy the root window
 
-# Create a simple GUI
-root = tk.Tk()
-root.title("RustDesk Renamer")
-root.geometry("400x300")
+# Main application setup
+icon_path = r"C:\Users\VenimK\Downloads\Mattahan-Buuf-They-reply-technosorcery.128.png"
+if os.path.isfile(icon_path):
+    splash = show_splash_screen(theme_name=theme_name, icon_path=icon_path)
+else:
+    print(f"Icon file does not exist at: {icon_path}")
 
-# Show splash screen and keep a reference to it
-splash = show_splash_screen()
+# Create and set up the main window
+root = ThemedTk()
+root.title("Infinite Remote")
+root.geometry("600x400")
+root.set_theme(theme_name)
 
-label = tk.Label(root, text="Select the RustDesk directory:")
+# Setup main window AFTER the splash screen closes
+setup_window(root, icon_path)
+
+# Create a frame for organization
+main_frame = ttk.Frame(root, padding="10")
+main_frame.pack(fill=tk.BOTH, expand=True)
+
+label = ttk.Label(main_frame, text="Select the RustDesk directory:")
 label.pack(pady=10)
 
-browse_button = tk.Button(root, text="Browse...", command=browse_directory)
+browse_button = ttk.Button(main_frame, text="Browse...", command=browse_directory)
 browse_button.pack(pady=5)
 
-app_name_label = tk.Label(root, text="Enter new application name:")
+app_name_label = ttk.Label(main_frame, text="Enter new application name:")
 app_name_label.pack(pady=5)
 
-app_name_entry = tk.Entry(root)
+app_name_entry = ttk.Entry(main_frame)
 app_name_entry.pack(pady=5)
 
-executable_name_label = tk.Label(root, text="Enter new executable name (without .exe):")
+executable_name_label = ttk.Label(main_frame, text="Enter new executable name (without .exe):")
 executable_name_label.pack(pady=5)
 
-executable_name_entry = tk.Entry(root)
+executable_name_entry = ttk.Entry(main_frame)
 executable_name_entry.pack(pady=5)
 
-command_label = tk.Label(root, text="Enter command to run after updates (or leave blank):")
+command_label = ttk.Label(main_frame, text="Enter command to run after updates (or leave blank):")
 command_label.pack(pady=5)
 
-command_entry = tk.Entry(root)
+command_entry = ttk.Entry(main_frame)
 command_entry.pack(pady=5)
+
+# Quit Button
+quit_button = ttk.Button(main_frame, text="Quit", command=root.quit)
+quit_button.pack(pady=10)
 
 # Configure the closing event
 root.protocol("WM_DELETE_WINDOW", on_closing)
 
 # Start the GUI loop
 root.mainloop()
+
+# Only necessary for debugging
+print(root.get_themes())  # This will list all available themes
