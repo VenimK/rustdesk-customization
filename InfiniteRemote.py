@@ -20,9 +20,8 @@ def set_icon(window, icon_path):
     """Set the icon for a given Tkinter window."""
     if icon_path and os.path.isfile(icon_path):
         try:
-            image = Image.open(icon_path)
-            photo = ImageTk.PhotoImage(image)
-            window.iconphoto(True, photo)  # Set the window icon
+            # For .ico files, use the file directly
+            window.iconbitmap(icon_path)  # This works for ICO files
             return True
         except Exception as e:
             print(f"Error loading icon: {e}")
@@ -34,7 +33,7 @@ def set_icon(window, icon_path):
 def show_splash_screen(theme_name="arc", icon_path=None):
     """Show a splash screen while the app is loading."""
     splash = ThemedTk(theme=theme_name)
-    splash.title("Loading...Infinite Remote")
+    splash.title("Loading... Infinite Remote")
     splash.geometry("300x200")
 
     # Center splash screen
@@ -270,24 +269,19 @@ def update_portable_cargo_toml(file_path, new_app_name):
 
         for line in content:
             stripped_line = line.strip()
-            print(f"Processing line: '{stripped_line}'")
 
             if stripped_line == '[package.metadata.winres]':
                 in_winres_section = True
-                print("Entering [package.metadata.winres] section.")
                 updated_content.append(line)
                 continue
             
             elif in_winres_section and stripped_line.startswith('['):
                 in_winres_section = False  
-                print("Exiting [package.metadata.winres] section.")
 
             if in_winres_section:
                 if stripped_line.startswith('ProductName ='):
-                    print(f"Updating ProductName from: {line.strip()} to ProductName = \"{new_app_name}\"")
                     line = f'ProductName = "{new_app_name}"\n'
                 elif stripped_line.startswith('OriginalFilename ='):
-                    print(f"Updating OriginalFilename from: {line.strip()} to OriginalFilename = \"{new_app_name.lower()}.exe\"")
                     line = f'OriginalFilename = "{new_app_name.lower()}.exe"\n'
 
             updated_content.append(line)
@@ -487,7 +481,7 @@ def on_closing():
         root.destroy()  # Destroy the root window
 
 # Main application setup
-icon_path = r"C:\Users\VenimK\Downloads\Mattahan-Buuf-They-reply-technosorcery.128.png"
+icon_path = r"C:\Users\VenimK\Downloads\Wrench.ico"
 if os.path.isfile(icon_path):
     splash = show_splash_screen(theme_name=theme_name, icon_path=icon_path)
 else:
@@ -499,8 +493,9 @@ root.title("Infinite Remote")
 root.geometry("600x400")
 root.set_theme(theme_name)
 
-# Setup main window AFTER the splash screen closes
-setup_window(root, icon_path)
+# Make sure to set the icon for the main window here
+if not set_icon(root, icon_path):
+    print("Failed to set icon on main window.")
 
 # Create a frame for organization
 main_frame = ttk.Frame(root, padding="10")
