@@ -618,18 +618,18 @@ executable_name_label.pack(pady=5)
 executable_name_entry = ttk.Entry(main_frame)
 executable_name_entry.pack(pady=5)
 
-command_label = ttk.Label(main_frame, text="Enter command to run after updates (or leave blank):")
-command_label.pack(pady=5)
-
-command_entry = ttk.Entry(main_frame)
-command_entry.pack(pady=5)
-
 # New Description Entry
 description_label = ttk.Label(main_frame, text="Enter new description AKA RustDesk Remote Desktop:")
 description_label.pack(pady=5)
 
 description_entry = ttk.Entry(main_frame)  # Entry for the description
 description_entry.pack(pady=5)
+
+command_label = ttk.Label(main_frame, text="Enter command to run after updates (or leave blank):")
+command_label.pack(pady=5)
+
+command_entry = ttk.Entry(main_frame)
+command_entry.pack(pady=5)
 
 # Quit Button
 quit_button = ttk.Button(main_frame, text="Quit", command=root.quit)
