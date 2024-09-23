@@ -13,6 +13,7 @@ import tkinter.ttk as ttk
 app_name_entry = None
 executable_name_entry = None
 command_entry = None
+description_entry = None  # New variable for the description entry
 
 # Set the theme name
 theme_name = "aquativo"
@@ -108,6 +109,44 @@ def write_file(file_path, content):
     with open(file_path, 'w', encoding='utf-8') as file:
         file.writelines(content)
 
+
+def update_cargo_toml_description(file_path, new_description):
+    """Update the Cargo.toml file to set the package description and FileDescription."""
+    try:
+        content = read_file(file_path)
+        if content is None:
+            return
+
+        updated_content = []
+        in_package_section = False
+        in_metadata_section = False
+        
+        for line in content:
+            stripped_line = line.strip()
+            if stripped_line == '[package]':
+                in_package_section = True
+                in_metadata_section = False  # Reset this for the next section
+            elif stripped_line == '[package.metadata.winres]':
+                in_metadata_section = True
+            
+            # Update description in the package section
+            if in_package_section and stripped_line.startswith('description ='):
+                line = f'description = "{new_description}"\n'
+                
+            # Update FileDescription in the metadata section
+            if in_metadata_section and stripped_line.startswith('FileDescription ='):
+                line = f'FileDescription = "{new_description}"\n'
+
+            updated_content.append(line)
+
+        write_file(file_path, updated_content)
+        print("Updated Cargo.toml with new description and FileDescription:")
+        print(''.join(updated_content))
+    except FileNotFoundError:
+        print("Cargo.toml file not found in the selected directory.")
+    except Exception as e:
+        print(f"An error occurred while updating Cargo.toml: {e}")
+
 def update_generate_py(file_path, new_executable_name):
     """Update the generate.py file with the new executable name."""
     print(f"Updating {file_path} with the new executable name: {new_executable_name}")
@@ -134,6 +173,36 @@ def update_build_py(file_path, new_app_name):
                 lines[i] = f"app_name = '{new_app_name}'\n"
                 break
         write_file(file_path, lines)
+
+def update_client_file(base_directory):
+    """Comment out the TCP connection security section in src/client.rs."""
+    file_path = os.path.join(base_directory, 'src', 'client.rs')
+    print(f"Updating {file_path} to comment out TCP connection security section.")
+
+    lines = read_file(file_path)
+    if lines is not None:
+        modified_lines = []
+        is_within_block = False
+        for line in lines:
+            stripped_line = line.strip()
+            # Start of the block to be commented out
+            if stripped_line.startswith('if !key.is_empty() && !token.is_empty() {'):
+                is_within_block = True
+                modified_lines.append("/*\n")
+            if is_within_block:
+                modified_lines.append(line)  # Add current line to modified
+            else:
+                modified_lines.append(line)  # Include unchanged lines
+            # End of the block to be commented out
+            if stripped_line == '}':
+                if is_within_block:  # Only close the block if we were inside it
+                    modified_lines.append("*/\n")
+                    is_within_block = False
+
+        write_file(file_path, modified_lines)
+        print("Successfully updated client.rs to comment out TCP connection security section.")
+    else:
+        print("Failed to read client.rs")
 
 def update_cargo_toml(file_path, new_app_name):
     """Update the Cargo.toml file to set name, default-run and modify features."""
@@ -427,6 +496,7 @@ def browse_directory():
     new_app_name = app_name_entry.get().strip()
     executable_name = executable_name_entry.get().strip()
     command_to_run = command_entry.get().strip()
+    new_description = description_entry.get().strip()  # Get new description
 
     if not new_app_name:
         messagebox.showwarning("Input Error", "Please enter a new application name.")
@@ -438,6 +508,11 @@ def browse_directory():
         root.deiconify()
         return
 
+    if not new_description:
+        messagebox.showwarning("Input Error", "Please enter a new description.")
+        root.deiconify()
+        return
+
     try:
         # Update the ui.rs with the new icon
         update_ui_file_with_icon(base_directory, new_icon_base64)
@@ -445,6 +520,10 @@ def browse_directory():
         # Call other update functions
         update_build_py(os.path.join(base_directory, 'build.py'), new_app_name)
         update_cargo_toml(os.path.join(base_directory, 'Cargo.toml'), new_app_name)
+        
+        # Update description and FileDescription in Cargo.toml
+        update_cargo_toml_description(os.path.join(base_directory, 'Cargo.toml'), new_description)
+
         update_native_model(os.path.join(base_directory, 'flutter', 'lib', 'models', 'native_model.dart'), new_app_name)
         update_platform_model(os.path.join(base_directory, 'flutter', 'lib', 'models', 'platform_model.dart'), new_app_name)
         update_web_model(os.path.join(base_directory, 'flutter', 'lib', 'models', 'web_model.dart'), new_app_name)
@@ -458,6 +537,9 @@ def browse_directory():
         update_rust_file(rust_file_path, new_app_name)
         update_rustdesk_desktop_file(os.path.join(base_directory, 'res', 'rustdesk.desktop'), new_app_name)
         update_rustdesk_service(os.path.join(base_directory, 'res', 'rustdesk.service'), new_app_name)
+
+        # Update client.rs file to comment out the TCP connection security section
+        update_client_file(base_directory)
 
         if executable_name:
             generate_py_path = os.path.join(base_directory, 'libs', 'portable', 'generate.py')
@@ -541,6 +623,13 @@ command_label.pack(pady=5)
 
 command_entry = ttk.Entry(main_frame)
 command_entry.pack(pady=5)
+
+# New Description Entry
+description_label = ttk.Label(main_frame, text="Enter new description AKA RustDesk Remote Desktop:")
+description_label.pack(pady=5)
+
+description_entry = ttk.Entry(main_frame)  # Entry for the description
+description_entry.pack(pady=5)
 
 # Quit Button
 quit_button = ttk.Button(main_frame, text="Quit", command=root.quit)
