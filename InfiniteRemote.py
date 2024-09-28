@@ -1,19 +1,43 @@
+import subprocess
+import sys
 import os
 import base64
-import subprocess
 import shutil
 import requests
-from PIL import Image, ImageTk
+from PIL import Image
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from ttkthemes import ThemedTk
 import tkinter.ttk as ttk
 
+# List of required packages
+required_packages = [
+    'requests',
+    'Pillow',  # For PIL (Pillow must be installed for Image module)
+    'ttkthemes'  # Ensure ttkthemes is installed
+]
+
+def install(package):
+    """Function to install package using pip."""
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', package])
+
+# Check for required packages
+for package in required_packages:
+    try:
+        __import__(package)
+    except ImportError:
+        print(f"{package} is not installed. Installing...")
+        install(package)
+    else:
+        print(f"{package} is already installed.")
+
 # Global variables for the entry fields
 app_name_entry = None
 executable_name_entry = None
 command_entry = None
-description_entry = None  # New variable for the description entry
+description_entry = None  # Variable for the description entry
+pub_key_entry = None  # Variable for the public key entry
+rendezvous_server_entry = None  # Variable for the custom ID server entry
 
 # Set the theme name
 theme_name = "aquativo"
@@ -30,6 +54,24 @@ def download_icon(icon_url, icon_path):
     except Exception as e:
         print(f"Error downloading icon: {e}")
         return False
+
+def download_file(url, destination):
+    """Download a file from a URL and save it to a local path."""
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        with open(destination, 'wb') as f:
+            f.write(response.content)
+        print(f"Downloaded successfully: {destination}")
+        return True
+    except Exception as e:
+        print(f"Error downloading file: {e}")
+        return False
+
+def download_sciter_dll(destination):
+    """Download sciter.dll from the given URL."""
+    url = "https://raw.githubusercontent.com/c-smile/sciter-sdk/master/bin.win/x64/sciter.dll"
+    return download_file(url, destination)
 
 def set_icon(window, icon_path):
     """Set the icon for a given Tkinter window."""
@@ -78,11 +120,6 @@ def show_splash_screen(theme_name="arc", icon_path=None):
     splash.lift()
     return splash
 
-def setup_window(root, icon_path):
-    """Set up the main window with the specified icon."""
-    if not set_icon(root, icon_path):
-        print("Failed to set icon on main window.")
-
 def select_file(title, filetypes):
     """Open a file dialog to select a file."""
     tk.Tk().withdraw()  # Prevents the root window from appearing
@@ -109,6 +146,10 @@ def write_file(file_path, content):
     with open(file_path, 'w', encoding='utf-8') as file:
         file.writelines(content)
 
+def convert_to_base64(image_path):
+    """Convert an image file to a Base64 string."""
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode('utf-8')
 
 def update_cargo_toml_description(file_path, new_description):
     """Update the Cargo.toml file to set the package description and FileDescription."""
@@ -158,11 +199,6 @@ def update_generate_py(file_path, new_executable_name):
                 break
         write_file(file_path, lines)
 
-def convert_to_base64(image_path):
-    """Convert an image file to a Base64 string."""
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode('utf-8')
-
 def update_build_py(file_path, new_app_name):
     """Update the build.py file with the new application name."""
     print(f"Updating {file_path} with the new application name: {new_app_name}")
@@ -173,36 +209,6 @@ def update_build_py(file_path, new_app_name):
                 lines[i] = f"app_name = '{new_app_name}'\n"
                 break
         write_file(file_path, lines)
-
-def update_client_file(base_directory):
-    """Comment out the TCP connection security section in src/client.rs."""
-    file_path = os.path.join(base_directory, 'src', 'client.rs')
-    print(f"Updating {file_path} to comment out TCP connection security section.")
-
-    lines = read_file(file_path)
-    if lines is not None:
-        modified_lines = []
-        is_within_block = False
-        for line in lines:
-            stripped_line = line.strip()
-            # Start of the block to be commented out
-            if stripped_line.startswith('if !key.is_empty() && !token.is_empty() {'):
-                is_within_block = True
-                modified_lines.append("/*\n")
-            if is_within_block:
-                modified_lines.append(line)  # Add current line to modified
-            else:
-                modified_lines.append(line)  # Include unchanged lines
-            # End of the block to be commented out
-            if stripped_line == '}':
-                if is_within_block:  # Only close the block if we were inside it
-                    modified_lines.append("*/\n")
-                    is_within_block = False
-
-        write_file(file_path, modified_lines)
-        print("Successfully updated client.rs to comment out TCP connection security section.")
-    else:
-        print("Failed to read client.rs")
 
 def update_cargo_toml(file_path, new_app_name):
     """Update the Cargo.toml file to set name, default-run and modify features."""
@@ -379,20 +385,100 @@ def update_portable_cargo_toml(file_path, new_app_name):
     except Exception as e:
         print(f"An error occurred while updating libs/portable/Cargo.toml: {e}")
 
-def update_config_rs(file_path, new_app_name):
-    """Update the config.rs file with the new application name."""
+def update_client_file(base_directory):
+    """Comment out the TCP connection security section in src/client.rs."""
+    file_path = os.path.join(base_directory, 'src', 'client.rs')
+    print(f"Updating {file_path} to comment out TCP connection security section.")
+
+    lines = read_file(file_path)
+    if lines is not None:
+        modified_lines = []
+        is_within_block = False
+        for line in lines:
+            stripped_line = line.strip()
+            # Start of the block to be commented out
+            if stripped_line.startswith('if !key.is_empty() && !token.is_empty() {'):
+                is_within_block = True
+                modified_lines.append("/*\n")
+            if is_within_block:
+                modified_lines.append(line)  # Add current line to modified
+            else:
+                modified_lines.append(line)  # Include unchanged lines
+            # End of the block to be commented out
+            if stripped_line == '}':
+                if is_within_block:  # Only close the block if we were inside it
+                    modified_lines.append("*/\n")
+                    is_within_block = False
+
+        write_file(file_path, modified_lines)
+        print("Successfully updated client.rs to comment out TCP connection security section.")
+    else:
+        print("Failed to read client.rs")
+
+def update_ui_file_with_icon(base_directory, icon_base64):
+    """Update the ui.rs file with the new Base64 encoded icon."""
+    ui_path = os.path.join(base_directory, "src", "ui.rs")
+    if not os.path.isfile(ui_path):
+        print("ui.rs file not found. Exiting.")
+        return
+
+    with open(ui_path, "r", encoding="utf-8") as file:
+        ui_content = file.readlines()
+
+    line_indices_to_replace = [788, 792]  # Adjust these line numbers based on your actual ui.rs
+
+    for index in line_indices_to_replace:
+        if 0 <= index < len(ui_content):
+            old_line = ui_content[index].strip()
+            print(f"Updating line {index + 1}: {old_line}")
+            new_line = f'        "data:image/png;base64,{icon_base64}".into()\n'
+            ui_content[index] = new_line
+
+    with open(ui_path, "w", encoding="utf-8") as file:
+        file.writelines(ui_content)
+
+    print("Updated Base64 strings in ui.rs successfully!")
+
+# Assuming this is part of the update process
+def update_config_rs(file_path, new_app_name, new_pub_key, new_rendezvous_server):
+    """Update the config.rs file with the new application name, public key, and rendezvous server."""
     try:
         lines = read_file(file_path)
         if lines is None:
             return
 
+        # Initialize flags to check if the lines have been modified
+        app_name_modified = False
+        pub_key_modified = False
+        rendezvous_server_modified = False  # New flag for rendezvous server update
+
         for i in range(len(lines)):
+            # Update the application name
             if "pub static ref APP_NAME: RwLock<String> = RwLock::new(" in lines[i]:
                 lines[i] = f'pub static ref APP_NAME: RwLock<String> = RwLock::new("{new_app_name}".to_owned());\n'
-        
+                app_name_modified = True
+
+            # Update the public key
+            if "pub const PUBLIC_RS_PUB_KEY: &str =" in lines[i]:
+                lines[i] = f'pub const PUBLIC_RS_PUB_KEY: &str = "{new_pub_key}";\n'
+                pub_key_modified = True
+
+          # Update the PROD_RENDEZVOUS_SERVER
+            if "pub static ref PROD_RENDEZVOUS_SERVER: RwLock<String> = RwLock::new(match option_env!(\"RENDEZVOUS_SERVER\") {" in lines[i]:
+                # Look for the next line that contains the "_ => """ statement
+                if i + 2 < len(lines) and "_ => \"\"" in lines[i + 2]:
+                    lines[i + 2] = f'    _ => "{new_rendezvous_server}",\n'
+                    rendezvous_server_modified = True
+
         write_file(file_path, lines)
-        print(f"Changed APP_NAME to '{new_app_name}'")
-    
+
+        if app_name_modified:
+            print(f"Changed APP_NAME to '{new_app_name}'")
+        if pub_key_modified:
+            print(f"Changed PUBLIC_RS_PUB_KEY to '{new_pub_key}'")
+        if rendezvous_server_modified:
+            print(f"Changed PROD_RENDEZVOUS_SERVER to '{new_rendezvous_server}'")
+
     except Exception as e:
         print(f"An error occurred: {e}")
 
@@ -429,33 +515,9 @@ def update_rustdesk_service(file_path, new_app_name):
                 break
         write_file(file_path, lines)
 
-def update_ui_file_with_icon(base_directory, icon_base64):
-    """Update the ui.rs file with the new Base64 encoded icon."""
-    ui_path = os.path.join(base_directory, "src", "ui.rs")
-    if not os.path.isfile(ui_path):
-        print("ui.rs file not found. Exiting.")
-        return
-
-    with open(ui_path, "r", encoding="utf-8") as file:
-        ui_content = file.readlines()
-
-    line_indices_to_replace = [788, 792]  # Lines 789 and 793
-
-    for index in line_indices_to_replace:
-        if 0 <= index < len(ui_content):
-            old_line = ui_content[index].strip()
-            print(f"Updating line {index + 1}: {old_line}")
-            new_line = f'        "data:image/png;base64,{icon_base64}".into()\n'
-            ui_content[index] = new_line
-
-    with open(ui_path, "w", encoding="utf-8") as file:
-        file.writelines(ui_content)
-
-    print("Updated Base64 strings in ui.rs successfully!")
-
 def browse_directory():
     """Open a dialog to browse directories and handle the updates."""
-    root.withdraw()  # Hide the main Tkinter window
+    root.withdraw()  # Hide the Tkinter window
 
     base_directory = select_directory("Select your RustDesk source directory.")
     if not base_directory:
@@ -463,17 +525,37 @@ def browse_directory():
         root.deiconify()
         return
 
-    icon_file = select_file("Select the Icon PNG Image", [("Image Files", "*.png")])
-    if not icon_file or not os.path.isfile(icon_file):
-        print("No icon image selected. Exiting.")
+    new_app_name = app_name_entry.get().strip()
+    new_pub_key = pub_key_entry.get().strip()
+    executable_name = executable_name_entry.get().strip()
+    command_to_run = command_entry.get().strip()
+    new_rendezvous_server = rendezvous_server_entry.get().strip()  # Retrieve the custom rendezvous server entry
+
+    # Validate inputs
+    if not new_app_name or not new_pub_key or not new_rendezvous_server:
+        messagebox.showwarning("Input Error", "App name, public key, and rendezvous server cannot be empty.")
         root.deiconify()
         return
-    new_icon_base64 = convert_to_base64(icon_file)
-
-    # Copy the selected icon to the RustDesk res directory as icon.ico and tray-icon
-    res_dir = os.path.join(base_directory, 'res')
 
     try:
+        # Update the config.rs with the new parameters
+        update_config_rs(os.path.join(base_directory, 'libs', 'hbb_common', 'src', 'config.rs'), new_app_name, new_pub_key, new_rendezvous_server)
+
+        icon_file = select_file("Select the Icon PNG Image", [("Image Files", "*.png")])
+        if not icon_file or not os.path.isfile(icon_file):
+            print("No icon image selected. Exiting.")
+            root.deiconify()
+            return
+        new_icon_base64 = convert_to_base64(icon_file)
+
+        # Download sciter.dll
+        sciter_dll_destination = os.path.join(base_directory, 'sciter.dll')
+        if download_sciter_dll(sciter_dll_destination):
+            print(f"Downloaded sciter.dll to {sciter_dll_destination}.")
+        
+        # Copy the selected icon to the RustDesk res directory as icon.ico and tray-icon
+        res_dir = os.path.join(base_directory, 'res')
+
         # Ensure the res directory exists
         if not os.path.exists(res_dir):
             print(f"The resource directory '{res_dir}' does not exist.")
@@ -490,40 +572,10 @@ def browse_directory():
         shutil.copy2(icon_destination_path, tray_icon_destination_path)
         print(f"Copied icon to '{tray_icon_destination_path}'")
 
-    except Exception as e:
-        print(f"An error occurred while processing the icon: {e}")
-
-    new_app_name = app_name_entry.get().strip()
-    executable_name = executable_name_entry.get().strip()
-    command_to_run = command_entry.get().strip()
-    new_description = description_entry.get().strip()  # Get new description
-
-    if not new_app_name:
-        messagebox.showwarning("Input Error", "Please enter a new application name.")
-        root.deiconify()
-        return
-
-    if not executable_name:
-        messagebox.showwarning("Input Error", "Please enter an executable name.")
-        root.deiconify()
-        return
-
-    if not new_description:
-        messagebox.showwarning("Input Error", "Please enter a new description.")
-        root.deiconify()
-        return
-
-    try:
-        # Update the ui.rs with the new icon
-        update_ui_file_with_icon(base_directory, new_icon_base64)
-
         # Call other update functions
         update_build_py(os.path.join(base_directory, 'build.py'), new_app_name)
         update_cargo_toml(os.path.join(base_directory, 'Cargo.toml'), new_app_name)
-        
-        # Update description and FileDescription in Cargo.toml
-        update_cargo_toml_description(os.path.join(base_directory, 'Cargo.toml'), new_description)
-
+        update_cargo_toml_description(os.path.join(base_directory, 'Cargo.toml'), description_entry.get().strip())
         update_native_model(os.path.join(base_directory, 'flutter', 'lib', 'models', 'native_model.dart'), new_app_name)
         update_platform_model(os.path.join(base_directory, 'flutter', 'lib', 'models', 'platform_model.dart'), new_app_name)
         update_web_model(os.path.join(base_directory, 'flutter', 'lib', 'models', 'web_model.dart'), new_app_name)
@@ -532,13 +584,9 @@ def browse_directory():
         update_main_cpp(os.path.join(base_directory, 'flutter', 'windows', 'runner', 'main.cpp'), new_app_name)
         update_runner_rc(os.path.join(base_directory, 'flutter', 'windows', 'runner', 'Runner.rc'), new_app_name)
         update_portable_cargo_toml(os.path.join(base_directory, 'libs', 'portable', 'Cargo.toml'), new_app_name)
-        update_config_rs(os.path.join(base_directory, 'libs', 'hbb_common', 'src', 'config.rs'), new_app_name)
         rust_file_path = os.path.join(base_directory, 'libs', 'portable', 'src', 'main.rs')
-        update_rust_file(rust_file_path, new_app_name)
         update_rustdesk_desktop_file(os.path.join(base_directory, 'res', 'rustdesk.desktop'), new_app_name)
         update_rustdesk_service(os.path.join(base_directory, 'res', 'rustdesk.service'), new_app_name)
-
-        # Update client.rs file to comment out the TCP connection security section
         update_client_file(base_directory)
 
         if executable_name:
@@ -547,7 +595,7 @@ def browse_directory():
 
         # Execute the inline-sciter.py script after updating files
         inline_sciter_path = os.path.join(base_directory, 'res', 'inline-sciter.py')
-        
+
         try:
             subprocess.run(["python", inline_sciter_path], cwd=base_directory, check=True)
             print("Successfully executed inline-sciter.py")
@@ -589,7 +637,7 @@ else:
 # Load main window after the splash
 root = ThemedTk()
 root.title("Infinite Remote")
-root.geometry("600x400")
+root.geometry("700x600")
 root.set_theme(theme_name)
 
 # Set the icon for the main window
@@ -624,6 +672,20 @@ description_label.pack(pady=5)
 
 description_entry = ttk.Entry(main_frame)  # Entry for the description
 description_entry.pack(pady=5)
+
+# New Public Key Entry
+pub_key_label = ttk.Label(main_frame, text="Enter new public key:")
+pub_key_label.pack(pady=5)
+
+pub_key_entry = ttk.Entry(main_frame)  # Entry for the public key
+pub_key_entry.pack(pady=5)
+
+# New Rendezvous Server Entry
+rendezvous_server_label = ttk.Label(main_frame, text="Enter new rendezvous server:")
+rendezvous_server_label.pack(pady=5)
+
+rendezvous_server_entry = ttk.Entry(main_frame)  # Entry for the custom rendezvous server
+rendezvous_server_entry.pack(pady=5)
 
 command_label = ttk.Label(main_frame, text="Enter command to run after updates (or leave blank):")
 command_label.pack(pady=5)
