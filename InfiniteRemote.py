@@ -572,6 +572,9 @@ def browse_directory():
         shutil.copy2(icon_destination_path, tray_icon_destination_path)
         print(f"Copied icon to '{tray_icon_destination_path}'")
 
+        # Update the ui.rs with the new icon
+        update_ui_file_with_icon(base_directory, new_icon_base64)
+
         # Call other update functions
         update_build_py(os.path.join(base_directory, 'build.py'), new_app_name)
         update_cargo_toml(os.path.join(base_directory, 'Cargo.toml'), new_app_name)
