@@ -333,14 +333,22 @@ def update_main_cpp(file_path, new_app_name):
 def update_runner_rc(file_path, new_app_name):
     """Update the Runner.rc file with the new application name."""
     print(f"Updating {file_path} with the new application name: {new_app_name}")
+
     lines = read_file(file_path)
     if lines is not None:
         for i, line in enumerate(lines):
+            # Update FileVersion, ProductVersion, ProductName, InternalName, and OriginalFilename
             if "FileVersion" in line:
-                lines[i] = f"FileVersion 1.0.0.0\n"
-                lines[i + 1] = f"ProductVersion 1.0.0.0\n"
-                lines[i + 2] = f"ProductName \"{new_app_name}\"\n"
-                break
+                lines[i] = f"            VALUE \"FileVersion\", \"1.0.0.0\" \"\\0\"\n"
+            elif "ProductVersion" in line:
+                lines[i] = f"            VALUE \"ProductVersion\", \"1.0.0.0\" \"\\0\"\n"
+            elif "ProductName" in line:
+                lines[i] = f"            VALUE \"ProductName\", \"{new_app_name}\" \"\\0\"\n"
+            elif "InternalName" in line:
+                lines[i] = f"            VALUE \"InternalName\", \"{new_app_name.lower()}\" \"\\0\"\n"
+            elif "OriginalFilename" in line:
+                lines[i] = f"            VALUE \"OriginalFilename\", \"{new_app_name.lower()}.exe\" \"\\0\"\n"
+
         write_file(file_path, lines)
 
 def update_portable_cargo_toml(file_path, new_app_name):
